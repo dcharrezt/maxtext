@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 #!/bin/bash
 #
 # This script automates finding the correct pod in a MaxText server workload
@@ -21,36 +20,39 @@
 # Usage:
 # bash port_forward_xpk.sh job_name=<job_name> project=<project> zone=<zone> cluster=<cluster> [namespace=<namespace>]
 
-set -eu # Exit immediately if a command exits with a non-zero status or if an unset variable is used.
+set -euo pipefail # Added pipefail to catch errors in pipelines
 
 # --- Argument Parsing ---
 NAMESPACE="default" # Default namespace
 
-for arg in "$@"
-do
-    case $arg in
-        job_name=*) 
-        JOB_NAME="${arg#*=}"
-        # Shift removes the current argument from the list of positional parameters ($@).
-        shift
-        ;;
-        project=*) 
-        PROJECT="${arg#*=}"
-        shift
-        ;;
-        zone=*) 
-        ZONE="${arg#*=}"
-        shift
-        ;;
-        cluster=*) 
-        CLUSTER="${arg#*=}"
-        shift
-        ;;
-        namespace=*) 
-        NAMESPACE="${arg#*=}"
-        shift
-        ;;
-    esac
+# Initialize variables to avoid unbound errors
+JOB_NAME=""
+PROJECT=""
+ZONE=""
+CLUSTER=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    job_name=*)
+      JOB_NAME="${1#*=}"
+      ;;
+    project=*)
+      PROJECT="${1#*=}"
+      ;;
+    zone=*)
+      ZONE="${1#*=}"
+      ;;
+    cluster=*)
+      CLUSTER="${1#*=}"
+      ;;
+    namespace=*)
+      NAMESPACE="${1#*=}"
+      ;;
+    *)
+      echo "Warning: Unknown argument $1"
+      ;;
+  esac
+  shift
 done
 
 # --- Validate Arguments ---
@@ -72,24 +74,40 @@ echo "Fetching cluster credentials..."
 gcloud container clusters get-credentials "$CLUSTER" --zone "$ZONE" --project "$PROJECT" > /dev/null
 
 # --- Find the Server Pod ---
-echo "Searching for pods in namespace '$NAMESPACE' with label 'job-name=$JOB_NAME'..."
-# Use a label selector for an efficient server-side lookup.
-# Read the space-separated pod names safely into a bash array.
-read -r -a PODS <<< "$(kubectl get pods -n "$NAMESPACE" -l "job-name=$JOB_NAME" -o jsonpath='{.items[*].metadata.name}')"
+echo "Searching for pods in namespace '$NAMESPACE' matching job '$JOB_NAME'..."
 
-if [ -z "$PODS" ]; then
-    echo "Error: No pods found for job name '$JOB_NAME' in namespace '$NAMESPACE'."
+# Initialize PODS array to prevent unbound variable error
+PODS=()
+
+# Method 1: Try finding by standard Kubernetes Job label
+# using ( ... ) syntax safely captures the output into an array
+PODS=($(kubectl get pods -n "$NAMESPACE" -l "job-name=$JOB_NAME" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true))
+
+# Method 2: Fallback - sometimes XPK/Kueue uses different labels, so we search by name prefix if Method 1 returned nothing
+if [ ${#PODS[@]} -eq 0 ]; then
+    echo "No pods found with label 'job-name=$JOB_NAME'. Trying to match by pod name..."
+    # Fetch all pods and grep for the job name
+    PODS=($(kubectl get pods -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep "$JOB_NAME" || true))
+fi
+
+# Check if we still have no pods
+if [ ${#PODS[@]} -eq 0 ]; then
+    echo "Error: No pods found for job name '$JOB_NAME' in namespace '$NAMESPACE' (checked labels and name match)."
     exit 1
 fi
+
+echo "Found candidate pods: ${PODS[*]}"
 
 SERVER_POD=""
 for pod in "${PODS[@]}"; do
     echo "Checking logs for pod: $pod..."
-    # Use grep -q for a silent check. The command succeeds if the pattern is found.
-    if kubectl logs "$pod" -n "$NAMESPACE" | grep -q "Uvicorn running on http://0.0.0.0:8000"; then
-        echo "Found server running in pod: $pod"
+    # We use '|| true' to prevent script exit if grep fails (not found)
+    if kubectl logs "$pod" -n "$NAMESPACE" --tail=100 2>/dev/null | grep -q "Uvicorn running on http://0.0.0.0:8000"; then
+        echo "✅ Found server running in pod: $pod"
         SERVER_POD=$pod
-        break # Exit the loop once the server pod is found
+        break 
+    else
+        echo "❌ Uvicorn not detected in this pod."
     fi
 done
 
@@ -97,8 +115,11 @@ done
 if [ -n "$SERVER_POD" ]; then
     echo "Establishing port-forward from localhost:8000 to $SERVER_POD:8000 in namespace '$NAMESPACE'..."
     echo "You can now send requests to http://localhost:8000"
+    
+    # Exec into kubectl port-forward
     kubectl port-forward "pod/$SERVER_POD" -n "$NAMESPACE" 8000:8000
 else
     echo "Error: Could not find a pod running the Uvicorn server for job '$JOB_NAME' in namespace '$NAMESPACE'."
+    echo "Please check if the server has fully started."
     exit 1
 fi
