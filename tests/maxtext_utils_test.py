@@ -374,7 +374,7 @@ class TestAssertParamsSufficientlySharded(unittest.TestCase):
     devices = np.array(jax.devices()).reshape((4, 1, 1, 1, 1))
     mesh = Mesh(devices, self.mesh_axes)
 
-    with mesh:
+    with jax.set_mesh(mesh):
       # Shard across multiple axes, including the valid 'fsdp' axis.
       pspec = PartitionSpec(("fsdp", "sequence"), "stage", ("tensor"), None)
       params = {"complex_layer": jax.device_put(jnp.ones((8, 8, 2, 2)), NamedSharding(mesh, pspec))}
@@ -389,7 +389,7 @@ class TestAssertParamsSufficientlySharded(unittest.TestCase):
     """
     devices = np.array(jax.devices()).reshape((4, 1, 1, 1, 1))
     mesh = Mesh(devices, self.mesh_axes)
-    with mesh:
+    with jax.set_mesh(mesh):
       pspec = PartitionSpec(("sequence", "context"), "stage", "tensor", None)
       params = {"complex_layer": jax.device_put(jnp.ones((8, 8, 2, 2)), NamedSharding(mesh, pspec))}
 
@@ -402,7 +402,7 @@ class TestAssertParamsSufficientlySharded(unittest.TestCase):
     """
     devices = np.array(jax.devices()).reshape((4, 1, 1, 1, 1))
     mesh = Mesh(devices, self.mesh_axes)
-    with mesh:
+    with jax.set_mesh(mesh):
       sharded_pspec = PartitionSpec(("fsdp", "sequence"), "stage", ("tensor"), None)
       sharded_param = jax.device_put(jnp.ones((8, 8, 2, 2)), NamedSharding(mesh, sharded_pspec))
       unsharded_param = jnp.ones((8, 8, 2, 2))
