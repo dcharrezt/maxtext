@@ -29,7 +29,7 @@ For efficient model inference and response generation during this process, we re
 Let's get started!
 
 ## Create virtual environment and Install MaxText dependencies
-Follow instructions in [Install MaxText](https://github.com/AI-Hypercomputer/maxtext/blob/main/docs/guides/install_maxtext.md), but 
+Follow instructions in [Install MaxText](https://maxtext.readthedocs.io/en/latest/install_maxtext.html), but 
 recommend creating the virtual environment outside the `maxtext` directory.
 
 

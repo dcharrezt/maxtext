@@ -69,9 +69,9 @@ You can run Python notebooks on a local JupyterLab environment, giving you full 
 
 ### Step 1: Set Up TPU VM
 
-In Google Cloud Console:
+In Google Cloud Console, create a standalone TPU VM:
 
-1.a. **Compute Engine** → **TPU** → **Create TPU**
+1.a. **Compute Engine** → **TPUs** → **Create TPU**
 
 1.b. Example config:
    - **Name:** `maxtext-tpu-node`
