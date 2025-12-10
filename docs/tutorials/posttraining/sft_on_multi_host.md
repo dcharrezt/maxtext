@@ -49,6 +49,7 @@ bash dependencies/scripts/docker_build_dependency_image.sh MODE=post-training
 ```
 
 ### 1.3. Upload the Docker image to Artifact Registry
+> **Note:** You will need the [**Artifact Registry Writer**](https://docs.cloud.google.com/artifact-registry/docs/access-control#permissions) role to push Docker images to your project's Artifact Registry and to allow the cluster to pull them during workload execution. If you don't have this permission, contact your project administrator to grant you this role through "Google Cloud Console** -> IAM -> Grant access".
 ```bash
 # Replace `$USER_runner` with your desired image name
 export DOCKER_IMAGE_NAME=${USER}_runner

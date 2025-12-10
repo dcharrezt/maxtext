@@ -109,6 +109,7 @@ bash dependencies/scripts/docker_build_dependency_image.sh MODE=post-training PO
 ```
 
 ### Upload the dependency docker image along with MaxText code
+> **Note:** You will need the [**Artifact Registry Writer**](https://docs.cloud.google.com/artifact-registry/docs/access-control#permissions) role to push Docker images to your project's Artifact Registry and to allow the cluster to pull them during workload execution. If you don't have this permission, contact your project administrator to grant you this role through "Google Cloud Console** -> IAM -> Grant access".
 ```
 bash dependencies/scripts/docker_upload_runner.sh CLOUD_IMAGE_NAME=${CLOUD_IMAGE_NAME}
 ```
